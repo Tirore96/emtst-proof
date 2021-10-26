@@ -4,7 +4,7 @@ From mathcomp Require Import all_ssreflect.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
+Require Import Equations.Equations.
 From SendRec Require Export Nom_Swap_fs.
 
 Inductive sort : Set :=
@@ -144,6 +144,14 @@ Inductive exp : Set :=
   | ff
   | var : name -> exp
 .
+
+Definition exp_eqb e0 e1 : bool :=
+match (e0,e1) with
+| (tt,tt) => true
+| (ff,ff) => false 
+| (var nm0,var nm1) => eqb nm0 nm1
+| _ => false
+end.
 
 
 (*
@@ -463,10 +471,79 @@ Definition mem := AtomSetImpl.mem.
 Definition atom_abs (nm : name) (P : proc) :=
   fun nm1 => if eq_dec nm1 nm then Some P
           else if mem nm1 (fv P) then None else Some (swap nm nm1 P).
+(*
+Lemma atom_abs_swap : forall b c a P, swap b c (atom_abs a P) = atom_abs (swap b c a) (swap b c P).*)
 
-Lemma atom_abs_swap : forall b c a P, swap b c (atom_abs a P) = atom_abs (swap b c a) (swap b c P) 
-Definition alpha_equiv
-           (* structural congruence *)
+Definition is_binder (P : proc) : option (name * proc) :=
+match P with
+| receive nm nmb P0 => Some (nmb, P0)
+| catch nm nmb P0 => Some (nmb, P0)
+| nu_nm nmb P0 => Some (nmb, P0)
+| nu_ch nmb P0 => Some (nmb, P0)
+| _ => None
+end.
+
+Fixpoint proc_size (P : proc) : nat := 
+match P with
+| send _ _ P0 => 1 + (proc_size P0)
+| receive _ _ P0 => 1 + (proc_size P0)
+| throw _ _ P0 => 1 + (proc_size P0)
+| catch _ _ P0 => 1 + (proc_size P0)
+| par P0 P1 => 1 + (proc_size P0) + (proc_size P1)
+| inact => 1
+| nu_nm _ P0 => 1 + (proc_size P0)
+| nu_ch _ P0 => 1 + (proc_size P0)
+end.
+
+Definition binder_eq f (p0 p1 : (name * proc)) : bool :=
+let (nm0,P0) := p0 in let (nm1,P1) := p1 in
+if eqb nm0 nm1 then f P0 P1
+                               else if mem nm0 (fv P1) then false 
+                               else f P0 (swap nm0 nm1 P1).
+
+Fixpoint aeq (P0 P1 : proc) : bool :=
+let binder_eq := binder_eq aeq in
+match P0,P1 with
+| (send nm0 e0 P0'), (send nm1 e1 P1') => (eqb nm0 nm1) && (exp_eqb e0 e1) && (aeq P0' P1')
+| (receive nm0 nmb0 P0'), (receive nm1 nmb1 P1') => (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'))
+| (throw nm0 nm0' P0'), (throw nm1 nm1' P1') => (eqb nm0 nm1) && (eqb nm0' nm1') && (aeq P0' P1')
+| (catch nm0 nmb0 P0'), (receive nm1 nmb1 P1') => (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'))
+| (nu_nm nm0 P0), (nu_nm nm1 P1) => binder_eq (nm0, P0) (nm1, P1)
+| (nu_ch nm0 P0), (nu_ch nm1 P1) => binder_eq (nm0, P0) (nm1, P1)
+| _, _ => false
+end.
+
+(*
+Equations aeq (P0 P1 : proc) : bool by wf (proc_size P0) :=
+{ 
+aeq (send nm0 e0 P0') (send nm1 e1 P1') := (eqb nm0 nm1) && (exp_eqb e0 e1) && (aeq P0' P1');
+aeq (receive nm0 nmb0 P0') (receive nm1 nmb1 P1')  := (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'));
+aeq (throw nm0 nm0' P0') (throw nm1 nm1' P1') := (eqb nm0 nm1) && (eqb nm0' nm1') && (aeq P0' P1');
+aeq (catch nm0 nmb0 P0') (receive nm1 nmb1 P1') := (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'));
+aeq (nu_nm nm0 P0) (nu_nm nm1 P1) := binder_eq (nm0, P0) (nm1, P1);
+aeq (nu_ch nm0 P0) (nu_ch nm1 P1) := binder_eq (nm0, P0) (nm1, P1);
+aeq  _ _ := false 
+}
+where binder_eq (p0 p1 : (name * proc)) : bool by wf (proc_size (snd p0)) :=
+{ binder_eq (nm0,P0) (nm1,P1) := if eqb nm0 nm1 then aeq P0 P1
+                               else if mem nm0 (fv P1) then false 
+                               else aeq P0 (swap nm0 nm1 P1) }.
+
+
+with aeq (P0 P1 : proc) {struct P0} : bool :=
+match P0,P1 with
+
+end.*)
+
+Definition atom_beq := eqb.
+Definition atom_eq_dec := eq_dec.
+Scheme Equality for exp.
+
+Reserved Notation "P =A= Q" := (aeq P Q) (at level 70, no associativity).
+
+Inductive aeq : proc -> proc -> Prop :=
+| aeq_send nm e P0 P1 (H: P0 =A= P1) : (send nm e P0) =A= (send nm e P1)
+| aeq_receive : (receive nm nm0 P0) =A= (receive nm nm1 P1) 
 
 Reserved Notation "P === Q" (at level 70).
 Inductive congruent : proc -> proc -> Set :=
