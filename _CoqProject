@@ -1,5 +1,5 @@
--Q theories/ SendRec
--R ext/finmap/theories FinMap
+-Q theories SendRec
+#-R ext/finmap/theories FinMap
 -arg -w
 -arg none
 theories/OddsAndEnds.v
@@ -11,3 +11,7 @@ theories/TypesO.v
 theories/SyntaxR.v
 theories/TypesR.v
 theories/SafetyR.v
+theories/Nom_Swap_fs.v
+#theories/Nom_Syntax.v
+#theories/Nom_Semantics.v
+#theories/Nom_SyntaxBST.v
