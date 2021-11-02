@@ -1,5 +1,6 @@
 (* The Send Receive System (REVISED). *)
 
+
 From mathcomp Require Import all_ssreflect.
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -156,13 +157,29 @@ Definition dual_pol p := if p is Pos then Neg else Pos.
 (**  NAMESPACES  **************************************************************)
 (******************************************************************************)
 
+Module A1 := Atom.Atom.
+Module A2 := Atom.Atom.
+
+Module Type S. End S.
+Module A <: S. End A.
+Module F (X : S). Inductive t := C. End F.
+Module B1 := F A.
+Module B2 := F A.
+Locate "=".
+Check (eq_refl nat).
+Check eq_refl  : 1 = 1.
+Fail Check eq_refl : B1.C = B1.C. (* The inductive types are different *)
+Check eqxx.
+Fail Check eq_refl : A1.atom = A1.atom.
+
+Check A1 = A2.
 Module EV := AtomScope Atom.Atom. (* Module of the atoms for expressions *)
 Canonical EV_atom_eqType := EqType EV.atom EV.atom_eqMixin.
 Canonical EV_atom_ordType := OrdType EV.atom EV.atom_ordMixin.
 Coercion EV.Free : EV.atom >-> EV.var.
 Coercion EV.Bound : nat >-> EV.var.
 Canonical EV_var_eqType := EqType _ EV.var_eqMixin.
-
+Print EV.open_var.
 Module SC := AtomScope Atom.Atom. (* Module of the atoms for names *)
 Canonical SC_atom_eqType := EqType SC.atom SC.atom_eqMixin.
 Canonical SC_atom_ordType := OrdType SC.atom SC.atom_ordMixin.
@@ -178,12 +195,14 @@ Coercion  LC.Bound : nat >-> LC.var.
 Canonical LC_var_eqType := EqType _ LC.var_eqMixin.
 
 Module CN := AtomScope Atom.Atom. (* Module of the atoms for channel name *)
+Locate CN.var.
 Canonical CN_atom_eqType := EqType CN.atom CN.atom_eqMixin.
 Canonical CN_atom_ordType := OrdType CN.atom CN.atom_ordMixin.
 Coercion CN.Free : CN.atom >-> CN.var.
 Coercion CN.Bound : nat >-> CN.var.
 Canonical CN_var_eqType := EqType _ CN.var_eqMixin.
 
+Locate CN.var.
 Notation evar := (EV.var).
 Notation scvar := (SC.var).
 Notation lcvar := (LC.var).
@@ -565,6 +584,7 @@ Proof.
     by apply: ReflectF; case F: _ / => //.
 Qed.
 
+Locate LC.Free.
 (* consider a boolean function instead of this inductive def *)
 Inductive lc : proc -> Prop :=
 | lc_request : forall (L : seq LC.atom) a P,

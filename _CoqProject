@@ -1,5 +1,5 @@
 -Q theories SendRec
-#-R ext/finmap/theories FinMap
+-R ext/finmap/theories FinMap
 -arg -w
 -arg none
 theories/OddsAndEnds.v

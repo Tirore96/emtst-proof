@@ -1,4 +1,5 @@
-Require Export TLC.LibTactics TLC.LibLogic TLC.LibNat.
+Require Import TLC.LibTactics TLC.LibLogic TLC.LibNat.
+
 Require Export Metalib.Metatheory.
 Require Export Coq.Setoids.Setoid.
 
@@ -6,6 +7,7 @@ Definition inter := AtomSetImpl.inter.
 Definition diff := AtomSetImpl.diff.
 Definition Equal := AtomSetImpl.Equal.
 
+Locate atom.
 
 Definition swap_aux (b:atom) (c:atom) (a:atom) :=
   if (a == b) then c else if (a == c) then b else a.

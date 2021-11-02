@@ -520,7 +520,7 @@ Proof. intros V W P'. revert W. apply size_induction with (x:=P').
   repeat (rewrite IH; auto; try nat_math; try fsetdec).
   - intros [|x]; simpl. fsetdec. simpl_swap_fs.
   - destruct atom_fresh. foldbind.
-    simpl. rewrite IH; auto; try (rewrite swap_size_eq; nat_math);
+    simpl. rewrite IH; auto; try (rewrite swap_sizes_eq; nat_math);
     try (apply fnsaxp; fsetdec). fsetdec. intro x0. rewrite in2. fsetdec.
 Qed.
 
