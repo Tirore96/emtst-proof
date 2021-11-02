@@ -1,150 +1,22 @@
 (* The Send Receive System. *)
-
 From mathcomp Require Import all_ssreflect.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 Require Import Equations.Equations.
-From SendRec Require Export Nom_Swap_fs.
+From SendRec Require  Nom_Swap_fs.
+Require Import Metalib.Metatheory.
+Require Import Coq.ssr.ssreflect.
+Require Import Lia.
+Require Import PP.Ppsimplmathcomp.
+Require Import Equations.Equations.
 
-Inductive sort : Set :=
-  | boole : sort (* boolean expression *)
-  | end_points : tp -> tp -> sort
-with tp : Set :=
-  | input : sort -> tp -> tp
-  | output : sort -> tp -> tp
-  | ch_input : tp -> tp -> tp
-  | ch_output : tp -> tp -> tp
- (* | offer_branch : tp -> tp -> tp
-  | take_branch : tp -> tp -> tp*)
-  | ended : tp
-  | bot : tp
-.
-
-Scheme tp_sort := Induction for tp Sort Prop
-  with sort_tp := Induction for sort Sort Prop. (* Minimality *)
-Combined Scheme tp_sort_mutind from tp_sort, sort_tp.
-
-Fixpoint dual (T : tp) : tp :=
-  match T with
-  | input s T => output s (dual T)
-  | output s T => input s (dual T)
-  | ch_input T T' => ch_output T (dual T')
-  | ch_output T T' => ch_input T (dual T')
-(*  | offer_branch T T' => take_branch (dual T) (dual T')
-  | take_branch T T' => offer_branch (dual T) (dual T')*)
-  | ended => ended
-  | bot => bot
-  end
-.
-
-
-Lemma dual_is_dual t : dual (dual t) = t.
-  elim t=>// ; rewrite/dual;  move=>//; rewrite-/dual;
-    do ? (move=> s t0 =>->);
-    do ? (move=> t0 R' t1 =>->); easy.
-Qed.
-
-
-(*
-Lemma double_dual t: t = dual(dual t).
-Proof.
-  elim t=>//; rewrite/dual=>//; rewrite-/dual ; congruence.
-Qed. *)
-
-Lemma double_dual t: dual(dual t) = t .
-  elim t=>//; rewrite/dual; rewrite-/dual;
-    do ? (move=> s t0 =>->)=>//;
-
-  move => t0 eq0 t1 =>->//.
-Qed.
-
-
-Fixpoint eq_tp (T T': tp) : bool :=
-  match T, T' with
-  | input s T, input s' T' => eq_sort s s' && eq_tp T T'
-  | output s T, output s' T' => eq_sort s s' && eq_tp T T'
-  | ch_input T1 T2, ch_input T1' T2' => eq_tp T1 T1' && eq_tp T2 T2'
-  | ch_output T1 T2, ch_output T1' T2' => eq_tp T1 T1' && eq_tp T2 T2'
-
-(*  | offer_branch T1 T2, offer_branch T1' T2' => eq_tp T1 T1' && eq_tp T2 T2'
-  | take_branch T1 T2, take_branch T1' T2' => eq_tp T1 T1' && eq_tp T2 T2'*)
-  | ended, ended => true
-  | bot, bot => true
-  | _, _ => false
-  end
-with eq_sort (s s' : sort) : bool :=
-  match s, s' with
-  | boole, boole => true
-  | end_points T1 T2, end_points T1' T2' => eq_tp T1 T1' && eq_tp T2 T2'
-  | _, _ => false
-  end.
-
-Lemma eq_imp_eq : (forall x y, eq_tp x y -> x = y) /\ forall s s', eq_sort s s' -> s = s'.
-Proof.
-  apply tp_sort_mutind ; intros; try destruct y  ; try destruct s'; try easy ;
-  inversion H1 ; apply Bool.andb_true_iff in H3 ; destruct H3 ;
-  try(move:H3 ; move/H0=>H3 ; move:H2 ; move/H=>H4 ; by rewrite H3 H4).
-Qed.
-
-Lemma eq_tp_refl x : eq_tp x x.
-Proof.
-  by elim x using tp_sort with (P:=fun x=>eq_tp x x) (P0:= fun s=>eq_sort s s)=>//;
-     move=>s H t H0; simpl; rewrite H H0.
-Qed.
-
-Lemma eq_sort_refl s : eq_sort s s.
-Proof.
-  by elim s using sort_tp with (P:=fun x=> eq_tp x x)=>//;
-     move=>x H t H0; simpl; rewrite H H0.
-Qed.
-
-Check Equality.axiom.
-
-Lemma eq_tpP : Equality.axiom eq_tp.
-Proof.
-  move=>x y.
-  apply: (iffP idP)=>[|<-].
-  apply eq_imp_eq.
-  apply eq_tp_refl.
-Qed.
-
-Lemma eq_sortP : Equality.axiom eq_sort.
-Proof.
-  move=>x y.
-  apply: (iffP idP)=>[|<-].
-  apply eq_imp_eq.
-  apply eq_sort_refl.
-Qed.
-
-Canonical tp_eqMixin := EqMixin eq_tpP.
-Canonical tp_eqType := Eval hnf in EqType tp tp_eqMixin.
-
-Canonical sort_eqMixin := EqMixin eq_sortP.
-Canonical sort_eqType := Eval hnf in EqType sort sort_eqMixin.
-
-(*
-Inductive name : Set :=
-  | fnm : atom -> name
-  | bnm : nat -> name
-.
-
-Coercion bnm : nat >-> name.
-Coercion fnm : atom >-> name.
-
-(* atoms are not a separate set from names *)
-Definition channel := name. *)
-
-
-Definition name := atom.
-Definition names := atoms.
-
+Definition mem := AtomSetImpl.mem.
 Inductive exp : Set :=
   | tt
   | ff
-  | var : name -> exp
+  | var : atom -> exp
 .
-
 Definition exp_eqb e0 e1 : bool :=
 match (e0,e1) with
 | (tt,tt) => true
@@ -154,352 +26,80 @@ match (e0,e1) with
 end.
 
 
-(*
-(* CoInductive just because we don't need an induction principle *)
-CoInductive label : Set := left | right.*)
-
 Inductive proc : Set :=
-(* request name over a bound channel with polarity and behave like proc *)
-(*| request : name -> proc -> proc
-| accept : name -> proc -> proc*)
+| send : atom -> exp -> proc -> proc
+| receive : atom -> atom -> proc -> proc
 
-| send : name -> exp -> proc -> proc
-| receive : name -> name -> proc -> proc
 
-(*| select : channel -> label -> proc -> proc
-| branch : channel -> proc -> proc -> proc*)
+| throw : atom -> atom -> proc -> proc
+| catch : atom -> atom  -> proc -> proc
 
-| throw : name -> name -> proc -> proc
-| catch : name -> name  -> proc -> proc
-
-(*| ife : exp -> proc -> proc -> proc*)
 | par : proc -> proc -> proc
 | inact : proc
-
-| nu_nm : name -> proc -> proc (* hides a name *)
-| nu_ch : name -> proc -> proc (* hides a channel *)
-
-(*| bang : proc -> proc (* process replication *)*)
-.
-Hint Constructors proc.
-
-(* Notation "k ![ e ] ; P" := (send k e P) (at level 67). *)
-(* Notation "k ?() `in P" := (receive k P) (at level 67). *)
-
-(*
-(* Open a bound variable in a name *)
-Definition orn (n : nat) (u : name) (nm : name) : name :=
-  match nm with
-    | fnm k => fnm k
-    | bnm i => if n == i then u else bnm i
-  end.
-
-(* Open a bound variable in an expression *)
-Definition oe (n : nat) (e' : exp) (e : exp) : exp :=
-  match e with
-    | var (bnm i) => if n == i then e' else e
-    | _ => e
-  end.
-
-Fixpoint op_with_nm (n : nat) (u : name) (P : proc) : proc :=
-  match P with
-  | request a P => request (orn n u a) (op_with_nm (S n) u P)
-  | accept a P => accept (orn n u a) (op_with_nm (S n) u P)
-  | send k e P => send (orn n u k) e (op_with_nm n u P)
-  | receive k P => receive (orn n u k) (op_with_nm (S n) u P)
-  | select k l P => select (orn n u k) l (op_with_nm n u P)
-  | throw k k' P => throw (orn n u k) (orn n u k') (op_with_nm n u P)
-  | catch k P => catch (orn n u k) (op_with_nm (S n) u P)
-  | branch k P Q => branch (orn n u k) (op_with_nm n u P) (op_with_nm n u Q)
-  | ife e P Q => ife e (op_with_nm n u P) (op_with_nm n u Q)
-  | par P Q => par (op_with_nm n u P) (op_with_nm n u Q)
-  | inact => inact
-  | nu_nm P => nu_nm (op_with_nm (S n) u P)
-  | nu_ch P => nu_ch (op_with_nm (S n) u P)
-  | bang P => (op_with_nm n u P)
-  end.
-
-Fixpoint op_with_exp (n : nat) (u : exp) (P : proc) : proc :=
-  match P with
-  | request a P => request a (op_with_exp (S n) u P)
-  | accept a P => accept a (op_with_exp (S n) u P)
-  | send k e P => send k (oe n u e) (op_with_exp n u P)
-  | receive k P => receive k (op_with_exp (S n) u P)
-  | select k l P => select k l (op_with_exp n u P)
-  | throw k k' P => throw k k' (op_with_exp n u P)
-  | catch k P => catch k (op_with_exp (S n) u P)
-  | branch k P Q => branch k (op_with_exp n u P) (op_with_exp n u Q)
-  | ife e P Q => ife (oe n u e) (op_with_exp n u P) (op_with_exp n u Q)
-  | par P Q => par (op_with_exp n u P) (op_with_exp n u Q)
-  | inact => inact
-  | nu_nm P => nu_nm (op_with_exp (S n) u P)
-  | nu_ch P => nu_ch (op_with_exp (S n) u P)
-  | bang P => bang (op_with_exp n u P)
-  end.
-
-Notation "{op k ~> u } t" := (op_with_nm k u t) (at level 67) : sr_scope.
-Notation "{ope k ~> e } t" := (op_with_exp k e t) (at level 67) : sr_scope.
-Open Scope sr_scope.
-
-Definition open P u :={op 0~>u} P.
-Definition opene P u :={ope 0~>u} P.
-
-Inductive lc_nm : name -> Prop :=
-  | lc_name x: lc_nm (fnm x)
+| nu_ch : atom -> proc -> proc
 .
 
-Hint Constructors lc_nm.
-
-Inductive lc_exp : exp -> Prop :=
-  | lc_tt : lc_exp tt
-  | lc_ff : lc_exp ff
-  | lc_var x of lc_nm x: lc_exp (var x)
-.
-
-Hint Constructors lc_exp.
-
-(* consider a boolean function instead of this inductive def *)
-Inductive lc : proc -> Prop :=
-| lc_request : forall (L : seq atom) a P,
-    lc_nm a ->
-    (forall x, x \notin L -> lc (open P x)) ->
-    lc (request a P)
-
-| lc_accept : forall (L : seq atom) a P,
-    lc_nm a ->
-    (forall x, x \notin L -> lc (open P x)) ->
-    lc (accept a P)
-
-| lc_send : forall k e P,
-    lc_nm k ->
-    lc_exp e ->
-    lc P ->
-    lc (send k e P)
-
-| lc_receive : forall (L : seq atom) k P,
-    lc_nm k ->
-    (forall x, x \notin L -> lc (opene P (var x))) ->
-    lc (receive k P)
-
-| lc_select : forall k l P,
-    lc_nm k ->
-    lc P ->
-    lc (select k l P)
-
-| lc_branch : forall k P Q,
-    lc_nm k ->
-    lc P -> lc Q ->
-    lc (branch k P Q)
-
-| lc_throw : forall k k' P,
-    lc_nm k -> lc_nm k' ->
-    lc P ->
-    lc (throw k k' P)
-
-| lc_catch : forall (L : seq atom) k P,
-    lc_nm k ->
-    (forall x, x \notin L -> lc (open P x)) ->
-    lc (catch k P)
-
-| lc_ife : forall e P Q,
-    lc_exp e -> lc P -> lc Q ->
-    lc (ife e P Q)
-
-| lc_par : forall P Q,
-    lc P -> lc Q ->
-    lc (par P Q)
-
-| lc_inact : lc inact
-
-| lc_nu_nm : forall (L : seq atom) P,
-    (forall x, x \notin L -> lc (open P x)) ->
-    lc (nu_nm P)
-
-| lc_nu_ch : forall (L : seq atom) P,
-    (forall x, x \notin L -> lc (open P x)) ->
-    lc (nu_ch P)
-| lc_bang P : lc P -> lc (bang P)
-.
-Hint Constructors lc.
-
-Definition body P := forall (L : seq atom) x, x \notin L -> lc (open P x).
- *)
-
-Fixpoint swap_exp (b c : name) (e: exp) : exp :=
-  match e with
-  | var nm => var (swap_aux b c nm)
-  | t => t
-  end.
-
-Fixpoint swap (b c:name) (P : proc) : proc :=
-  match P with
-  | send nm e P0 => send (swap_aux b c nm) (swap_exp b c e) (swap b c P0)                       
-  | receive nm0 nm1 P0 => receive (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
-  | throw nm0 nm1 P0 => throw (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
-  | catch nm0 nm1 P0 => catch (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
-  | par P0 P1 => par (swap b c P0) (swap b c P1)
-  | inact => inact
-  | nu_nm nm P0 => nu_nm (swap_aux b c nm) (swap b c P0)
-  | nu_ch nm P0 => nu_ch (swap_aux b c nm) (swap b c P0)    
-  end.
+Notation "k ![ e ] ; p0" := (send k e p0)(at level 70) .
+Notation "k ? ( x ) 'in' p0" := (receive k x p0)(at level 70) .
 
 
-Definition subst_nm (a x nm : name) : name
-  := if eq_dec nm x then a else nm.
+Notation "p0 |||| p1" := (par p0 p1)(at level 81, left associativity) .
 
-Definition subst_exp (e : exp) (x : name) (e_body : exp) : exp :=
-  match e_body with
-  | var nm => if eq_dec nm x then e else var nm
-  | t => t
-  end.          
+Fixpoint proc_eqb p0 p1 := 
+match p0,p1 with
+| (send a0 e0 p0'),(send a1 e1 p1') => eqb a0 a1 && exp_eqb e0 e1 && proc_eqb p0' p1'
+| (receive a0 a0' p0'),(receive a1 a1' p1') => eqb a0 a1 && eqb a0' a1' && proc_eqb p0' p1'
+| (throw a0 a0' p0'),(throw a1 a1' p1') => eqb a0 a1 && eqb a0' a1' && proc_eqb p0' p1'
+| (catch a0 a0' p0'),(catch a1 a1' p1') => eqb a0 a1 && eqb a0' a1' && proc_eqb p0' p1'
+| (par p0' p0''),(par p1' p1'') => proc_eqb p0' p1' && proc_eqb p0'' p1''
+| inact,inact => true
+| nu_ch nm0 p0', nu_ch nm1 p1' => eqb nm0 nm1 && proc_eqb p0' p1'
+| _,_ => false 
+end.
 
-Fixpoint subst_proc_exp (e : exp) (x : name) (P : proc) : proc :=
-  match P with
-  | send nm e0 P0 => send nm (subst_exp e x e0) (subst_proc_exp e x P0)
-  | receive nm0 nm1 P0 => receive nm0 nm1 (subst_proc_exp e x P0)                        
-  | throw nm0 nm1 P0 => throw nm0 nm1 (subst_proc_exp e x P0)
-  | catch nm0 nm1 P0 => catch nm0 nm1 (subst_proc_exp e x P0)
-  | par P0 P1 => par (subst_proc_exp e x P0) ( subst_proc_exp e x P1)
-  | inact => inact
-  | nu_nm nm P0 => nu_nm nm (subst_proc_exp e x P0)              
-  | nu_ch nm P0 => nu_ch nm(subst_proc_exp e x P0)
-  end.                     
-
-
-(*
-(* substitutions *) (* substitute free atom z by channel u in ... *)
-Definition subst_ch (z : atom) (u : channel) (k : channel) : channel :=
-  match k with
-  | fnm k' => if z == k' then u else k
-  | _ => k
-  end.
-
-Definition subst_exp (x : atom) (e' : exp) (e : exp) : exp :=
-  match e with
-    | var (fnm y) => if x == y then e' else e
-    | _ => e
-  end.
-
-(* consider removing this as it is not an operation for the original system *)
-Fixpoint subst_proc (z : atom) (u : channel) (P : proc) : proc :=
-  match P with
-  | request a P => request (subst_ch z u a) (subst_proc z u P)
-  | accept a P => accept (subst_ch z u a) (subst_proc z u P)
-  | send k e P => send (subst_ch z u k) e (* (subst_exp z u e) *) (subst_proc z u P)
-  | receive k P => receive (subst_ch z u k) (subst_proc z u P)
-  | select k l P => select (subst_ch z u k) l (subst_proc z u P)
-  | branch k P Q => branch (subst_ch z u k) (subst_proc z u P) (subst_proc z u Q)
-  | throw k k' P => throw (subst_ch z u k) (subst_ch z u k') (subst_proc z u P)
-  | catch k P => catch (subst_ch z u k) (subst_proc z u P)
-  | ife e P Q => ife e (* (subst_exp z u e) *) (subst_proc z u P) (subst_proc z u Q)
-  | par P Q => par (subst_proc z u P) (subst_proc z u Q)
-  | inact => inact
-  | nu_nm P => nu_nm (subst_proc z u P)
-  | nu_ch P => nu_ch (subst_proc z u P)
-  | bang P => bang (subst_proc z u P)
-  end.
-
-Fixpoint subst_proc_exp (z : atom) (e : exp) (P : proc) : proc :=
-  match P with
-  | request a P => request a (subst_proc_exp z e P)
-  | accept a P => accept a (subst_proc_exp z e P)
-  | send k e' P => send k (subst_exp z e e') (subst_proc_exp z e P)
-  | receive k P => receive k (subst_proc_exp z e P)
-  | select k l P => select k l (subst_proc_exp z e P)
-  | branch k P Q => branch k (subst_proc_exp z e P) (subst_proc_exp z e Q)
-  | throw k k' P => throw k k' (subst_proc_exp z e P)
-  | catch k P => catch k (subst_proc_exp z e P)
-  | ife e' P Q => ife (subst_exp z e e') (subst_proc_exp z e P) (subst_proc_exp z e Q)
-  | par P Q => par (subst_proc_exp z e P) (subst_proc_exp z e Q)
-  | inact => inact
-  | nu_nm P => nu_nm (subst_proc_exp z e P)
-  | nu_ch P => nu_ch (subst_proc_exp z e P)
-  | bang P => bang (subst_proc_exp z e P)
-  end.
-
-Notation "s[ z ~> u ]p P" := (subst_proc z u P) (at level 68) : sr_scope.
-Notation "s[ z ~> u ]pe P" := (subst_proc_exp z u P) (at level 68) : sr_scope.
- *)
-
-Locate "{}".
-Definition fv_exp (e : exp) : names :=
+Definition fv_exp (e : exp) : atoms  :=
   match e with
     | tt => {}
     | ff => {}
     | var a =>  {{ a }}
   end.
 
-Fixpoint fv (P : proc) : names :=
+Fixpoint fv (P : proc) : atoms :=
   match P with
   | send nm e P0 => {{ nm }} `union` (fv_exp e) `union` (fv P0)
-  | receive nm0 nm1 P0 => {{ nm0 }} `union` {{ nm1 }} `union` (fv P0)
+  | receive nm0 nm1 P0 => {{ nm0 }} `union` (remove nm1 (fv P0))
   | throw nm0 nm1 P0 => {{ nm0 }} `union` {{ nm1 }} `union` (fv P0)
-  | catch nm0 nm1 P0 => {{ nm0 }} `union` {{ nm1 }} `union` (fv P0)
+  | catch nm0 nm1 P0 => {{ nm0 }} `union` (remove nm1 (fv P0))
   | par P0 P1 => (fv P0) `union` (fv P1)
   | inact => {}
-  | nu_nm nm P0 => remove nm (fv P0)
   | nu_ch nm P0 => remove nm (fv P0)
-end.                    
-         
+end.          
 
-Fixpoint cotype (t : tp) : tp :=
-  match t with
-  | input s t => output s (cotype t)
-  | output s t => output s (cotype t)
-  | ch_input t t' => ch_output t (cotype t')
-  | ch_output t t' => ch_input t (cotype t')
-(*  | offer_branch t t' => take_branch (cotype t) (cotype t')
-  | take_branch t t' => offer_branch (cotype t) (cotype t') *)
-  | end_proc => end_proc
-  end
-.
+Definition swap_aux := Nom_Swap_fs.swap_aux.
+          
+Fixpoint swap_exp (b c : atom) (e: exp) : exp :=
+  match e with
+  | var nm => var (swap_aux b c nm)
+  | t => t
+  end.
 
-(* just to show properties of substitution and locally closedness *)
+Fixpoint swap (b c: atom) (P : proc) : proc :=
+  match P with
+  | send nm e P0 => send (swap_aux b c nm) (swap_exp b c e) (swap b c P0)
+  | receive nm0 nm1 P0 => receive (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
+  | throw nm0 nm1 P0 => throw (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
+  | catch nm0 nm1 P0 => catch (swap_aux b c nm0) (swap_aux b c nm1) (swap b c P0)
+  | par P0 P1 => par (swap b c P0) (swap b c P1)
+  | inact => inact
+  | nu_ch nm P0 => nu_ch (swap_aux b c nm) (swap b c P0)
+  end.
 
-(*Lemma subst_lc_nm : forall (x : atom) a b,
-    lc_nm b ->
-    lc_nm a ->
-    lc_nm (subst_ch x a b).
-Proof.
-  intros.
-  induction H ; simpl ; auto.
-  destruct (x == x0) ; easy.
-Qed.
- *)
-Check In.
-Definition mem := AtomSetImpl.mem.
-Definition atom_abs (nm : name) (P : proc) :=
-  fun nm1 => if eq_dec nm1 nm then Some P
-          else if mem nm1 (fv P) then None else Some (swap nm nm1 P).
-(*
-Lemma atom_abs_swap : forall b c a P, swap b c (atom_abs a P) = atom_abs (swap b c a) (swap b c P).*)
-
-Definition is_binder (P : proc) : option (name * proc) :=
-match P with
-| receive nm nmb P0 => Some (nmb, P0)
-| catch nm nmb P0 => Some (nmb, P0)
-| nu_nm nmb P0 => Some (nmb, P0)
-| nu_ch nmb P0 => Some (nmb, P0)
-| _ => None
-end.
-
-Fixpoint proc_size (P : proc) : nat := 
-match P with
-| send _ _ P0 => 1 + (proc_size P0)
-| receive _ _ P0 => 1 + (proc_size P0)
-| throw _ _ P0 => 1 + (proc_size P0)
-| catch _ _ P0 => 1 + (proc_size P0)
-| par P0 P1 => 1 + (proc_size P0) + (proc_size P1)
-| inact => 1
-| nu_nm _ P0 => 1 + (proc_size P0)
-| nu_ch _ P0 => 1 + (proc_size P0)
-end.
-
-Definition binder_eq f (p0 p1 : (name * proc)) : bool :=
+Definition binder_eq f (p0 p1 : (atom * proc)) : bool :=
 let (nm0,P0) := p0 in let (nm1,P1) := p1 in
 if eqb nm0 nm1 then f P0 P1
-                               else if mem nm0 (fv P1) then false 
+                               else if AtomSetImpl.mem nm0 (fv P1) then false 
                                else f P0 (swap nm0 nm1 P1).
+
 
 Fixpoint aeq (P0 P1 : proc) : bool :=
 let binder_eq := binder_eq aeq in
@@ -508,118 +108,163 @@ match P0,P1 with
 | (receive nm0 nmb0 P0'), (receive nm1 nmb1 P1') => (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'))
 | (throw nm0 nm0' P0'), (throw nm1 nm1' P1') => (eqb nm0 nm1) && (eqb nm0' nm1') && (aeq P0' P1')
 | (catch nm0 nmb0 P0'), (receive nm1 nmb1 P1') => (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'))
-| (nu_nm nm0 P0), (nu_nm nm1 P1) => binder_eq (nm0, P0) (nm1, P1)
 | (nu_ch nm0 P0), (nu_ch nm1 P1) => binder_eq (nm0, P0) (nm1, P1)
 | _, _ => false
 end.
 
-(*
-Equations aeq (P0 P1 : proc) : bool by wf (proc_size P0) :=
-{ 
-aeq (send nm0 e0 P0') (send nm1 e1 P1') := (eqb nm0 nm1) && (exp_eqb e0 e1) && (aeq P0' P1');
-aeq (receive nm0 nmb0 P0') (receive nm1 nmb1 P1')  := (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'));
-aeq (throw nm0 nm0' P0') (throw nm1 nm1' P1') := (eqb nm0 nm1) && (eqb nm0' nm1') && (aeq P0' P1');
-aeq (catch nm0 nmb0 P0') (receive nm1 nmb1 P1') := (eqb nm0 nm1) && (binder_eq (nmb0, P0') (nmb1, P1'));
-aeq (nu_nm nm0 P0) (nu_nm nm1 P1) := binder_eq (nm0, P0) (nm1, P1);
-aeq (nu_ch nm0 P0) (nu_ch nm1 P1) := binder_eq (nm0, P0) (nm1, P1);
-aeq  _ _ := false 
-}
-where binder_eq (p0 p1 : (name * proc)) : bool by wf (proc_size (snd p0)) :=
-{ binder_eq (nm0,P0) (nm1,P1) := if eqb nm0 nm1 then aeq P0 P1
-                               else if mem nm0 (fv P1) then false 
-                               else aeq P0 (swap nm0 nm1 P1) }.
-
-
-with aeq (P0 P1 : proc) {struct P0} : bool :=
-match P0,P1 with
-
-end.*)
-
-Definition atom_beq := eqb.
-Definition atom_eq_dec := eq_dec.
-Scheme Equality for exp.
-
-Reserved Notation "P =A= Q" := (aeq P Q) (at level 70, no associativity).
-
-Inductive aeq : proc -> proc -> Prop :=
-| aeq_send nm e P0 P1 (H: P0 =A= P1) : (send nm e P0) =A= (send nm e P1)
-| aeq_receive : (receive nm nm0 P0) =A= (receive nm nm1 P1) 
 
 Reserved Notation "P === Q" (at level 70).
-Inductive congruent : proc -> proc -> Set :=
+Inductive congruent : proc -> proc -> Prop :=
 | c_refl P : P === P
-| c_alpha P Q (H: atom_abs nm0 P): P === P 
+| c_alpha P Q (H: aeq P Q): P === P 
 | c_inact P : (par inact P) === P
 | c_comm P Q: (par P Q) === (par Q P)
 | c_asoc P Q R: (par (par P Q) R) === (par P (par Q R))
-| c_nu_nm P Q: (par (nu_nm P) Q) === (nu_nm (par P Q))
-| c_nu_ch P Q: (par (nu_ch P) Q) === (nu_ch (par P Q))
-| c_nu_nm_inact : nu_nm inact === inact
-| c_nu_ch_inact : nu_ch inact === inact
+| c_nu_ch P Q nm (H: nm \notin (fv Q)) : (par (nu_ch nm P) Q) === (nu_ch nm (par P Q))
+| c_nu_ch_inact nm : nu_ch nm inact === inact
 where "P === Q" := (congruent P Q).
 
-           (*
-Reserved Notation "P === Q" (at level 70).
-Inductive congruent : proc -> proc -> Set :=
-| c_refl P : P === P (* replaces alpha because LN has alpha equivalence built in *)
-| c_inact P : (par inact P) === P
-| c_comm P Q: (par P Q) === (par Q P)
-| c_asoc P Q R: (par (par P Q) R) === (par P (par Q R))
-| c_nu_nm P Q: (par (nu_nm P) Q) === (nu_nm (par P Q))
-| c_nu_ch P Q: (par (nu_ch P) Q) === (nu_ch (par P Q))
-| c_nu_nm_inact : nu_nm inact === inact
-| c_nu_ch_inact : nu_ch inact === inact
-| c_bang P : bang P === par P (bang P)
-where "P === Q" := (congruent P Q).*)
 
-(* reductions *)
+Fixpoint congruent_fun P Q :=
+if proc_eqb P Q then true
+else if aeq P Q then true
+else match P, Q with
+     | (par inact P'),_ => proc_eqb P' Q
+     | (par (par P' P'') P'''),(par Q' (par Q'' Q''')) => proc_eqb P' Q' && proc_eqb P'' Q'' && proc_eqb P''' Q''' 
+     | (par P' P''),(par Q' Q'') => proc_eqb P' Q'' && proc_eqb P'' Q'
+     | (par (nu_ch nm P') P''), (nu_ch nm' (par Q' Q'')) => eqb nm nm' && proc_eqb P' Q' && proc_eqb P'' Q'' && (negb (AtomSetImpl.mem nm (fv P''))) 
+     | (nu_ch m inact), inact => true 
+     | _, _ => false 
+     end.
 
-Reserved Notation "P --> Q" (at level 70).
+
+
+Definition subst_exp (e : exp) (x : atom) (e_body : exp) : exp :=
+  match e_body with
+  | var nm => if eq_dec nm x then e else var nm
+  | t => t
+  end.
+
+Fixpoint proc_size (P : proc) : nat :=
+match P with
+| send _ _ P0 => 1 + (proc_size P0)
+| receive _ _ P0 => 1 + (proc_size P0)
+| throw _ _ P0 => 1 + (proc_size P0)
+| catch _ _ P0 => 1 + (proc_size P0)
+| par P0 P1 => 1 + (proc_size P0) + (proc_size P1)
+| inact => 1
+| nu_ch _ P0 => 1 + (proc_size P0)
+end.
+
+Lemma swap_size : forall a b P, proc_size (swap a b P) = proc_size P.
+Proof. 
+move=> a b P. elim P;
+do ? (move=> a0 e p H0/=//; rewrite H0//).
+rewrite e/=//. rewrite /=//.
+move => a0 p/= =>->//. 
+Qed.
+
+Obligation Tactic := move => *;do ? ((do ? rewrite swap_size); apply : leP; rewrite /=; ppsimpl;lia).
+
+Equations subst_proc_exp (e : exp) (x : atom) (P : proc) : proc by wf (proc_size P)  :=
+subst_proc_exp e x (send nm e0 P0) := send nm (subst_exp e x e0) (subst_proc_exp e x P0);
+subst_proc_exp e x (receive nm0 nm1 P0) := if eqb x nm1 then  (receive nm0 nm1 P0) 
+                                                        else let (z,_) := atom_fresh (fv P0 `union`fv_exp e) in
+                                                             receive nm0 z (subst_proc_exp e x (swap nm1 z P0));
+subst_proc_exp e x (throw nm0 nm1 P0) := throw nm0 nm1 (subst_proc_exp e x P0);
+subst_proc_exp e x (catch nm0 nm1 P0) := catch nm0 nm1 (subst_proc_exp e x P0);
+subst_proc_exp e x (par P0 P1) := par (subst_proc_exp e x P0) ( subst_proc_exp e x P1);
+subst_proc_exp e x inact := inact;
+subst_proc_exp e x (nu_ch nm P0) := nu_ch nm (subst_proc_exp e x P0).
+
+
+
+Definition subst_nm (a x nm : atom) : atom :=
+if eqb x nm then a else nm.
+
+
+Equations subst_proc_nm (a x: atom)  (P : proc) : proc by wf (proc_size P)  :=
+subst_proc_nm a x (send nm e P0) := send (subst_nm a x nm) e (subst_proc_nm a x P0);
+subst_proc_nm a x (receive nm0 nm1 P0) := receive (subst_nm a x nm0) nm1 (subst_proc_nm a x P0);
+subst_proc_nm a x (throw nm0 nm1 P0) := throw (subst_nm a x nm0) (subst_nm a x nm1) (subst_proc_nm a x P0);
+subst_proc_nm a x (catch nm0 nm1 P0) := if eqb x nm1 then catch (subst_nm a x nm0) nm1 P0 
+                                                      else let (z,_) := atom_fresh (add a (fv P0) ) in 
+                                                              catch (subst_nm a x nm0) z (subst_proc_nm a x (swap nm1 z P0));
+subst_proc_nm a x (par P0 P1) := par (subst_proc_nm a x P0) ( subst_proc_nm a x P1);
+subst_proc_nm a x inact := inact;
+subst_proc_nm a x (nu_ch nm P0) := if eqb x nm then nu_ch nm P0 
+                                                else let (z,_) := atom_fresh (add a (fv P0)) in 
+                                                     nu_ch z (subst_proc_nm a x (swap nm z P0)).
+
 Inductive red : proc -> proc -> Prop :=
-| r_link P Q a:
-    body P -> body Q ->
-    (par (accept a P) (accept a Q)) -->
-        (nu_nm (par P Q))
+| r_com k e nm P Q:
+    (par (send k e P) (receive k nm Q)) --> (par P (subst_proc_exp e nm Q))
 
-| r_com k e P Q:
-    lc P -> body Q ->
-    (par (send k e P) (receive k Q)) --> (par P (opene Q e))
-
-| r_pass k k' P Q:
-    lc P -> body Q ->
-    (par (throw k k' P) (catch k Q)) --> (par P (open Q k')) (* <-- k' is not like on the paper *)
+| r_pass k k' k'' P Q (H: k' \notin (fv Q)) :
+    (par (throw k k' P) (catch k k'' Q)) --> (par P (subst_proc_nm k' k'' Q))
 
 | r_cong P P' Q Q' :
-    lc P -> lc Q ->
-    P === P' ->
+    congruent_fun P P' ->
     P' --> Q' ->
-    Q' === Q ->
+    congruent_fun Q' Q ->
     P --> Q
 
-| r_scop_nm P P':
-    (forall (L : seq atom) x, x \notin L -> (open P x) --> (open P' x)) ->
-    nu_nm P --> nu_nm P'
+| r_scop_ch P P' nm (H: P --> P') : nu_ch nm P --> nu_ch nm P'
 
-| r_scop_ch P P':
-    (forall (L : seq atom) k, k \notin L -> (open P k) --> (open P' k)) ->
-    nu_ch P --> nu_ch P'
-
-| r_par P P' Q:
-    lc Q ->
-    P --> P' ->
-    par P Q --> par P' Q
-
-| r_sel_l k P Pl Pr:
-    lc P -> lc Pl -> lc Pr ->
-    par (select k left P) (branch k Pl Pr) --> par P Pl
-
-| r_sel_r k P Pl Pr:
-    lc P -> lc Pl -> lc Pr ->
-    par (select k right P) (branch k Pl Pr) --> par P Pr
-
-(* for now I will add these rules *)
-
-| r_done P: P --> P
-| r_tran P Q R: P --> Q -> Q --> R -> P --> R
+| r_par P P' Q (H: P --> P') : par P Q --> par P' Q
 
 where "P --> Q" := (red P Q).
+
+Ltac atom_destruct :=
+  repeat match goal with
+         | [ |- context[Atom.eq_dec ?e ?e0] ] 
+                => destruct (Atom.eq_dec e e0);try contradiction
+         | [ _ : context[Atom.eq_dec ?e ?e0]  |- _ ] 
+                => destruct (Atom.eq_dec e e0);try contradiction
+         end.
+
+Ltac atom_unf := rewrite /eqb ; atom_destruct.
+
+Definition k0 := fresh [::].
+Definition k1 := fresh [::k0].
+(*A very simple example*)
+Lemma ex1 : (k0![tt];inact |||| k0? (k1) in inact) --> (inact |||| inact).
+Proof. eapply r_com. Qed. 
+
+(*Building on the simple example, instead of P -> inact |||| inact, we now have inact |||| P -> inact.
+  Congruence rules must be used on both initial and reduced process before applying r_com.  *)
+Lemma ex_cong_comp : (inact |||| (k0![tt]; inact |||| k0? (k1) in inact)) --> inact.
+Proof. apply : r_cong. 2: { apply : ex1. } rewrite /=. atom_unf. rewrite /=//. rewrite /=//. 
+Qed.
+
+(*The inductive definition is useful when processes are to be manipulated (eg. change P to inact |||| P),
+  the function definition is useful if we are done manipulating and simply want to verify that two
+  processes are congruent, given if congruent_fun returns true *)
+Lemma congruent_iff : forall P Q, P === Q <-> congruent_fun P Q.
+Proof. Admitted.
+
+(*The counter example that breaks subject reduction*)
+Lemma counter_ex : forall k0 k1 k2 k3, ((throw k0 k1 inact) |||| (catch k0 k2 (k2? (k3) in (k1![tt]; inact)))) -->
+                                    (k1? (k3) in (k1![tt]; inact)).
+Proof.
+move => k0 k1 k2 k3. apply : r_cong. rewrite -congruent_iff. apply : c_refl. 2: { rewrite -congruent_iff. apply : c_inact. } apply : r_cong. rewrite -congruent_iff. apply c_refl. apply : r_pass. destruct_notin. rewrite /fv. 
+(*
+We are stuck on the goal 
+k1
+  `notin` union (singleton k2)
+            (remove k3 (union (singleton k1) (union (fv_exp tt) empty)))
+Since k1 is in the set
+*)
+Abort. 
+
+Lemma eqb_refl : forall k, eqb k k.
+Proof. move=>k. atom_unf. done. Qed.
+
+(*We replace k1 with k2 in the receiving process, that way it does not end up with both sides of the channel*)
+Lemma counter_ex_fixed : forall k0 k1 k2 k3, k1 `notin` (singleton k1) -> 
+  ((throw k0 k1 inact) |||| (catch k0 k2 (k2? (k3) in (k2![tt]; inact)))) -->
+                                    (k1? (k3) in (k1![tt]; inact)).
+Proof.
+move => k0 k1 k2 k3 H. apply : r_cong. rewrite -congruent_iff. apply : c_refl. 2: { rewrite -congruent_iff. apply : c_inact. } apply : r_cong. rewrite -congruent_iff. apply c_refl. apply : r_pass. solve_notin. (*metalib tactic*)
+simp subst_proc_nm. rewrite /=. rewrite /subst_nm. do ? rewrite eqb_refl. rewrite /=//. 
+Qed.
