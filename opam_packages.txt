@@ -1,0 +1,23 @@
+# Packages matching: installed
+# Name                 # Installed # Synopsis
+base-bigarray          base
+base-num               base        Num library distributed with the OCaml compil
+base-threads           base
+base-unix              base
+camlp5                 7.14        Preprocessor-pretty-printer of OCaml
+conf-findutils         1           Virtual package relying on findutils
+conf-perl              1           Virtual package relying on perl
+coq                    8.10.2      Formal proof management system
+coq-bignums            8.10.0      Bignums, the Coq library of arbitrary large n
+coq-equations          1.2.1+8.10  A function definition package for Coq
+coq-fcsl-pcm           1.2.0       Partial Commutative Monoids
+coq-htt                dev         pinned to version dev at git+https://github.c
+coq-mathcomp-ssreflect 1.10.0      Small Scale Reflection
+coq-metalib            dev         Locally Nameless Metatheory Library
+coq-ppsimpl            8.10.0      Ppsimpl is a reflexive tactic for canonising
+coq-tlc                20200328    TLC: A Library for Classical Coq
+num                    0           The Num library for arbitrary-precision integ
+ocaml                  4.05.0      The OCaml compiler (virtual package)
+ocaml-base-compiler    4.05.0      Official 4.05.0 release
+ocaml-config           1           OCaml Switch Configuration
+ocamlfind              1.9.1       A library manager for OCaml
