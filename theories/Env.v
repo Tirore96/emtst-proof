@@ -50,7 +50,7 @@ Section Environment.
 
   Definition upd x t E :=
     if E is Def els then Def (ins x t els) else Undef.
-
+Check fnd.
   Definition look x E :=
     if E is Def els then fnd x els else None.
 

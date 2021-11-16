@@ -157,22 +157,7 @@ Definition dual_pol p := if p is Pos then Neg else Pos.
 (**  NAMESPACES  **************************************************************)
 (******************************************************************************)
 
-Module A1 := Atom.Atom.
-Module A2 := Atom.Atom.
 
-Module Type S. End S.
-Module A <: S. End A.
-Module F (X : S). Inductive t := C. End F.
-Module B1 := F A.
-Module B2 := F A.
-Locate "=".
-Check (eq_refl nat).
-Check eq_refl  : 1 = 1.
-Fail Check eq_refl : B1.C = B1.C. (* The inductive types are different *)
-Check eqxx.
-Fail Check eq_refl : A1.atom = A1.atom.
-
-Check A1 = A2.
 Module EV := AtomScope Atom.Atom. (* Module of the atoms for expressions *)
 Canonical EV_atom_eqType := EqType EV.atom EV.atom_eqMixin.
 Canonical EV_atom_ordType := OrdType EV.atom EV.atom_ordMixin.

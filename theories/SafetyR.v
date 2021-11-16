@@ -670,7 +670,7 @@ Proof.
     apply: t_par =>//; last by do 2 rewrite add_union unionC.
     move: (EV.fresh_not_in ((fv_exp e ++ fv_e Q) ++L)).
     set x := EV.fresh ((fv_exp e ++ fv_e Q) ++L).
-    rewrite !mem_cat !negb_or => /andP-[/andP-[x_fve x_fvQ] x_fvL].
+    rewrite !mem_cat !negb_or => /andP[/andP-[x_fve x_fvQ] x_fvL].
     move: (OQ x x_fvL) => {OQ} OQ.
     move: (oft_def_ctx OQ) => defG; move: (binds_top_add defG) OQ => bindsG.
     move: (wkn_ctx_oft_exp Oe defG) => {Oe} Oe.

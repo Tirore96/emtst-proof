@@ -15,3 +15,4 @@ theories/Nom_Swap_fs.v
 #theories/Nom_Syntax.v
 #theories/Nom_Semantics.v
 theories/NomSyntaxBST.v
+theories/MapFunction.v

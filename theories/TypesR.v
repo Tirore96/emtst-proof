@@ -1492,7 +1492,7 @@ Proof.
     move: (def_subst_nested Hdef') => Hdef''.
     have Hdef_c: forall T, (def (add c T D0))
         by move=>T; rewrite def_addb Hdef'' cD0.
-    have k'k : k != k' by rewrite eq_sym.
+    have k'k : k != k' by rewrite eq_sym.x
     have cks : forall p : polarity, ke (k, p) != c
       by move=>pl; move: (negPf (ck pl)); rewrite eq_sym=>->.
     have cks' : forall p : polarity, ke (k', p) != c
