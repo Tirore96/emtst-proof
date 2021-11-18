@@ -1,18 +1,19 @@
 Require Import TLC.LibTactics TLC.LibLogic TLC.LibNat.
 
-Require Export Metalib.Metatheory.
-Require Export Coq.Setoids.Setoid.
+Require Import Metalib.Metatheory.
 
-Definition inter := AtomSetImpl.inter.
-Definition diff := AtomSetImpl.diff.
-Definition Equal := AtomSetImpl.Equal.
 
-Locate atom.
+Locate eq_dec. Require Export Coq.Setoids.Setoid.
+Require Import SendRec.Atom.
 
-Definition swap_aux (b:atom) (c:atom) (a:atom) :=
-  if (a == b) then c else if (a == c) then b else a.
 
-Tactic Notation "simpl_swap_aux" := unfold swap_aux;
+Definition inter := M.inter.
+Definition diff := M.diff.
+Definition Equal := M.Equal. 
+
+Definition swap_aux (b c a:atom) : atom := if (a == b) then c else if (a == c) then b else a.
+
+Tactic Notation "simpl_swap_aux" :=  unfold swap_aux;
   intros; simpl; repeat (case_if; try nat_math); subst; auto.
 Tactic Notation "simpl_swap_aux" "*" := unfold swap_aux in *;
   intros; simpl in *; repeat (case_if; try nat_math); subst; auto.
@@ -38,25 +39,42 @@ Lemma swap_aux_r : forall b c, swap_aux b c c = b.
 Proof. simpl_swap_aux. Qed.
 
 
+Lemma swap_aux_same : forall a b, swap_aux a a b = b.
+Proof. simpl_swap_aux. Qed.
+
+
+
+Notation "x `in` E" :=
+  (M.In x E)
+  (at level 70).
+
+Notation "x `notin` E" :=
+  (~ M.In x E)
+  (at level 70).
+
+Notation "E `union` F" :=
+  (M.union E F)
+  (at level 65, right associativity, format "E  `union`  '/' F").
+
 
 Definition swap_fs (b c : atom) (s : atoms) : atoms :=
-  if (AtomSetImpl.mem b s) then
-       (if (AtomSetImpl.mem c s) then s else (add c (remove b s)))
-  else if (AtomSetImpl.mem c s) then (add b (remove c s)) else s.
+  if (M.mem b s) then
+       (if (M.mem c s) then s else (M.add c (M.remove b s)))
+  else if (M.mem c s) then (M.add b (M.remove c s)) else s.
 
 Lemma swap_fs_1 : forall a b c s,
       a `in` s -> (swap_aux b c a) `in` (swap_fs b c s).
 Proof. intros. unfold swap_fs. simpl_swap_aux; try fsetdec;
-  try apply AtomSetImpl.mem_2 in C1; try apply AtomSetImpl.mem_2 in C0; auto;
-  apply AtomSetImpl.mem_1 in H; rewrite H in *; try inversion C0; inversion C2.
+  try apply M.mem_2 in C1; try apply M.mem_2 in C0; auto;
+  apply M.mem_1 in H; rewrite H in *; try inversion C0; inversion C2.
 Qed.
-
+Check atoms.
 Lemma swap_fs_1' : forall a b c s,
       (swap_aux b c a) `in` (swap_fs b c s) -> a `in` s.
-Proof. intros. unfold swap_fs in *. simpl_swap_aux*; try fsetdec;
-  try apply AtomSetImpl.mem_2 in C1; try apply AtomSetImpl.mem_2 in C0;
-  try apply AtomSetImpl.mem_2 in C2; auto; try fsetdec;
-  apply AtomSetImpl.mem_1 in H; rewrite H in *; inversion C1.
+Proof. intros.  unfold swap_fs in *. simpl_swap_aux*; try fsetdec;
+  try apply M.mem_2 in C1; try apply M.mem_2 in C0;
+  try apply M.mem_2 in C2; auto; try fsetdec;
+  apply M.mem_1 in H; rewrite H in *; inversion C1.
 Qed.
 
 Lemma swap_fs_2 : forall a b c s,
@@ -85,6 +103,16 @@ Lemma swap_fs_4' : forall a b c s,
       a `notin` (swap_fs b c s) -> (swap_aux b c a) `notin` s .
 Proof. intros. asserts_rewrite (a = swap_aux b c (swap_aux b c a)) in H.
   simpl_swap_aux. apply swap_fs_2' in H. auto. Qed.
+
+
+Notation "E [=] F" :=
+  (M.Equal E F)
+  (at level 70, no associativity).
+
+Notation "E [<=] F" :=
+  (M.Subset E F)
+  (at level 70, no associativity).
+
 
 
 Lemma swap_fs_in : forall b c s, b `in` s -> c `in` s ->
@@ -143,15 +171,15 @@ Proof. intros. rewrites <- (>>swap_fs_invo s). apply swap_fs_monotone. auto. Qed
 
 Lemma swap_fs_mon_left' : forall b c s s',
   s [<=] (swap_fs b c s') -> swap_fs b c s [<=] s'.
-Proof. intros. rewrites <- (>>swap_fs_invo s'). apply swap_fs_monotone. auto. Qed.
+Proof. intros. rewrites <- (>>swap_fs_invo s'). apply swap_fs_monotone. auto. Qed. Check M.add.
 
 Lemma add_swap_fs : forall b c x s,
-  add (swap_aux b c x) (swap_fs b c s) [=] swap_fs b c (add x s).
+  M.add (swap_aux b c x) (swap_fs b c s) [=] swap_fs b c (M.add x s).
 Proof.
-assert (forall b c s, add c (swap_fs b c s) [=] swap_fs b c (add b s)).
+assert (forall b c s, M.add c (swap_fs b c s) [=] swap_fs b c (M.add b s)).
 { intros. intro. destruct (a==c); subst.
-    + split. { intros _ . apply swap_fs_3. simpl_swap_aux. } intro. fsetdec.
-    + asserts_rewrite (a `in` add c (swap_fs b c s) <-> a `in` swap_fs b c s).
+    + split. { intros _ . apply swap_fs_3. simpl_swap_aux. fsetdec. fsetdec. } intro. fsetdec.
+    + asserts_rewrite (a `in` M.add c (swap_fs b c s) <-> a `in` swap_fs b c s).
       fsetdec. split. { apply swap_fs_monotone; fsetdec. }
       intro. apply swap_fs_3' in H. assert (swap_aux b c a `in` s).
       { simpl_swap_aux*; fsetdec. } apply swap_fs_3. auto.
@@ -161,31 +189,32 @@ assert (forall b c s, add c (swap_fs b c s) [=] swap_fs b c (add b s)).
   - intro. destruct(a==x); subst; split; intro.
     + apply swap_fs_3. simpl_swap_aux.
     + fsetdec.
-    + assert (a `in` swap_fs b c s) by fsetdec.
-      apply (swap_fs_monotone b c s (add x s)); fsetdec.
+    +  fsetdec. apply (swap_fs_monotone b c s (M.add x s)). fsetdec.
+
+    + assert (a `in` swap_fs b c s) by fsetdec. auto.
     + apply swap_fs_3' in H0. assert (swap_aux b c a `in` s).
         { simpl_swap_aux*; fsetdec. } apply swap_fs_3 in H1. fsetdec.
 Qed.
 
 Lemma add_swap_fs_2 : forall b c x s,
-  add x (swap_fs b c s) [=] swap_fs b c (add (swap_aux b c x) s).
+  M.add x (swap_fs b c s) [=] swap_fs b c (M.add (swap_aux b c x) s).
 Proof. intros. erewrite <- (swap_aux_invo _ _ x) at 1. apply add_swap_fs. Qed.
 
-Lemma empty_swap_fs : forall b c, swap_fs b c empty [=] empty.
+Lemma empty_swap_fs : forall b c, swap_fs b c M.empty [=] M.empty.
 Proof. intros. split.
   + intro. apply swap_fs_3' in H. fsetdec.
   + fsetdec.
 Qed.
 
 Lemma remove_swap_fs : forall b c x s,
-  remove (swap_aux b c x) (swap_fs b c s) [=] swap_fs b c (remove x s).
+  M.remove (swap_aux b c x) (swap_fs b c s) [=] swap_fs b c (M.remove x s).
 Proof.
-assert (forall b c s, remove c (swap_fs b c s) [=] swap_fs b c (remove b s)).
+assert (forall b c s, M.remove c (swap_fs b c s) [=] swap_fs b c (M.remove b s)).
 { intros. intro. destruct (a==c); subst.
     + split. fsetdec. intro. apply swap_fs_3' in H. simpl_swap_aux*; fsetdec.
-    + asserts_rewrite (a `in` remove c (swap_fs b c s) <-> a `in` swap_fs b c s).
+    + asserts_rewrite (a `in` M.remove c (swap_fs b c s) <-> a `in` swap_fs b c s).
       fsetdec. split. { intro. apply swap_fs_3' in H.
-      assert (swap_aux b c a `in` remove b s). {simpl_swap_aux*; fsetdec. }
+      assert (swap_aux b c a `in` M.remove b s). {simpl_swap_aux*; fsetdec. }
       apply swap_fs_3. auto. } { apply swap_fs_monotone; fsetdec. }
 }
 intros. simpl_swap_aux*.
@@ -197,22 +226,22 @@ intros. simpl_swap_aux*.
       simpl_swap_aux*; fsetdec.
     + apply swap_fs_3' in H0. simpl_swap_aux*; fsetdec.
     + enough (a `in` swap_fs b c s) by fsetdec.
-      apply (swap_fs_monotone b c (remove x s) s); fsetdec.
+      apply (swap_fs_monotone b c (M.remove x s) s); fsetdec.
 Qed.
 
 Lemma remove_swap_fs_2 : forall b c x s,
-  remove x (swap_fs b c s) [=] swap_fs b c (remove (swap_aux b c x) s).
+  M.remove x (swap_fs b c s) [=] swap_fs b c (M.remove (swap_aux b c x) s).
 Proof. intros. erewrite <- (swap_aux_invo _ _ x) at 1. apply remove_swap_fs. Qed.
 
 Lemma union_swap_fs : forall b c s s',
-  union (swap_fs b c s) (swap_fs b c s') [=] swap_fs b c (union s s').
+  M.union (swap_fs b c s) (swap_fs b c s') [=] swap_fs b c (M.union s s').
 Proof. intros. split.
   - intro. destruct (classic (a `in` (swap_fs b c s))).
     + apply swap_fs_3' in H0. apply swap_fs_3. fsetdec.
     + assert (a `in` (swap_fs b c s')) by fsetdec.
       apply swap_fs_3' in H1. apply swap_fs_3. fsetdec.
   - intro. apply swap_fs_3' in H. destruct (classic (swap_aux b c a `in` s)).
-    + apply swap_fs_3 in H0. fsetdec.
+    + apply swap_fs_3 in H0. fsetdec.A
     + assert (swap_aux b c a `in` s') by fsetdec.
       apply swap_fs_3 in H1. fsetdec.
 Qed.
@@ -250,7 +279,7 @@ Proof. intros. split.
 Qed.
 
 Add Parametric Morphism b c : (swap_fs b c)
-    with signature (AtomSetImpl.Equal) ==> (Equal)
+    with signature (M.Equal) ==> (Equal)
       as swap_fs_morphism.
 Proof. intros. split; apply swap_fs_monotone; fsetdec. Qed.
 
@@ -261,15 +290,15 @@ Proof. intros. rewrite <- swap_fs_invo. rewrites <- (>>swap_fs_invo s').
 Qed.
 
 Lemma equal_empty_swap_fs : forall b c s,
-  s [=] empty -> swap_fs b c s [=] empty.
+  s [=] M.empty -> swap_fs b c s [=] M.empty.
 Proof. intros. erewrite <- empty_swap_fs. apply swap_fs_morphism. auto. Qed.
 
 Lemma equal_empty_swap_fs' : forall b c s,
-  swap_fs b c s [=] empty -> s [=] empty.
+  swap_fs b c s [=] M.empty -> s [=] M.empty.
 Proof. intros. eapply swap_fs_morphism'. erewrite H.
   rewrite empty_swap_fs. fsetdec.
 Qed.
 
 Lemma remove_diff_add : forall x s s',
-    diff s (add x s') [=] remove x (diff s s').
+    diff s (M.add x s') [=] M.remove x (diff s s').
 Proof. intros. fsetdec. Qed.

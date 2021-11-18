@@ -125,6 +125,7 @@ Definition nat_eq_dec := Atom.nat_eq_dec.
 
 Canonical atom_eqType := EqType Atom.t Atom.atom_eqMixin.
 
+
 Module M := FSetAVL.Make(Atom).
 
 Module MapFunction := MapFunction M.
